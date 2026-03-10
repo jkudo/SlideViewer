@@ -49,6 +49,8 @@ function App() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [slideViewportHeight, setSlideViewportHeight] = useState(420)
+  const [slideStageWidth, setSlideStageWidth] = useState(0)
+  const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 })
   const slideStageRef = useRef(null)
 
   const baseUrl = import.meta.env.BASE_URL
@@ -221,8 +223,10 @@ function App() {
       const viewportHeight = window.visualViewport?.height || window.innerHeight
       const availableHeight = Math.floor(viewportHeight - rect.top - viewportPadding)
       const nextHeight = Math.max(minHeight, availableHeight)
+      const nextWidth = Math.max(0, Math.floor(rect.width))
 
       setSlideViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight))
+      setSlideStageWidth((prev) => (prev === nextWidth ? prev : nextWidth))
     }
 
     const rafId = window.requestAnimationFrame(updateSlideViewportHeight)
@@ -243,6 +247,25 @@ function App() {
       observer.disconnect()
     }
   }, [error, isEmbedMode, loadingDecks, pageCount, selectedDeck?.id])
+
+  useEffect(() => {
+    setImageNaturalSize({ width: 0, height: 0 })
+  }, [pageImageUrl])
+
+  const fittedImageSize = useMemo(() => {
+    if (imageNaturalSize.width <= 0 || imageNaturalSize.height <= 0 || slideStageWidth <= 0 || slideViewportHeight <= 0) {
+      return null
+    }
+
+    const widthScale = slideStageWidth / imageNaturalSize.width
+    const heightScale = slideViewportHeight / imageNaturalSize.height
+    const scale = Math.min(widthScale, heightScale)
+
+    return {
+      width: Math.max(1, Math.floor(imageNaturalSize.width * scale)),
+      height: Math.max(1, Math.floor(imageNaturalSize.height * scale)),
+    }
+  }, [imageNaturalSize.height, imageNaturalSize.width, slideStageWidth, slideViewportHeight])
 
   async function copyEmbedCode() {
     if (!embedUrl) {
@@ -378,7 +401,17 @@ function App() {
 
               <div className="slide-stage" ref={slideStageRef} style={{ height: `${slideViewportHeight}px` }}>
                 {pageImageUrl ? (
-                  <img key={pageImageUrl} src={pageImageUrl} alt={`${title} page ${currentPage}`} className="viewer-image" />
+                  <img
+                    key={pageImageUrl}
+                    src={pageImageUrl}
+                    alt={`${title} page ${currentPage}`}
+                    className="viewer-image"
+                    style={fittedImageSize ? { width: `${fittedImageSize.width}px`, height: `${fittedImageSize.height}px` } : undefined}
+                    onLoad={(event) => {
+                      const { naturalWidth, naturalHeight } = event.currentTarget
+                      setImageNaturalSize({ width: naturalWidth || 0, height: naturalHeight || 0 })
+                    }}
+                  />
                 ) : (
                   <p className="hint">Slide image is not ready yet. Run deployment again.</p>
                 )}
