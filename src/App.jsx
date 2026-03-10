@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 function getOwnerRepo() {
@@ -48,6 +48,8 @@ function App() {
   const [loadingDecks, setLoadingDecks] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [slideViewportHeight, setSlideViewportHeight] = useState(420)
+  const slideStageRef = useRef(null)
 
   const baseUrl = import.meta.env.BASE_URL
   const manifestUrl = `${baseUrl}decks/index.json`
@@ -207,6 +209,30 @@ function App() {
     window.history.replaceState(null, '', nextUrl)
   }, [currentPage, isEmbedMode, selectedDeck])
 
+  useEffect(() => {
+    function updateSlideViewportHeight() {
+      if (!slideStageRef.current) {
+        return
+      }
+
+      const rect = slideStageRef.current.getBoundingClientRect()
+      const viewportPadding = isEmbedMode ? 10 : 16
+      const minHeight = isEmbedMode ? 180 : 240
+      const availableHeight = Math.floor(window.innerHeight - rect.top - viewportPadding)
+      const nextHeight = Math.max(minHeight, availableHeight)
+
+      setSlideViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight))
+    }
+
+    const rafId = window.requestAnimationFrame(updateSlideViewportHeight)
+    window.addEventListener('resize', updateSlideViewportHeight)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', updateSlideViewportHeight)
+    }
+  }, [error, isEmbedMode, loadingDecks, pageCount, selectedDeck?.id])
+
   async function copyEmbedCode() {
     if (!embedUrl) {
       return
@@ -321,11 +347,13 @@ function App() {
                 </button>
               </div>
 
-              {pageImageUrl ? (
-                <img key={pageImageUrl} src={pageImageUrl} alt={`${title} page ${currentPage}`} className="viewer-image" />
-              ) : (
-                <p className="hint">Slide image is not ready yet. Run deployment again.</p>
-              )}
+              <div className="slide-stage" ref={slideStageRef} style={{ height: `${slideViewportHeight}px` }}>
+                {pageImageUrl ? (
+                  <img key={pageImageUrl} src={pageImageUrl} alt={`${title} page ${currentPage}`} className="viewer-image" />
+                ) : (
+                  <p className="hint">Slide image is not ready yet. Run deployment again.</p>
+                )}
+              </div>
 
               {!isEmbedMode && (
                 <div className="actions">
