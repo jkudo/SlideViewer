@@ -347,14 +347,6 @@ function App() {
                 </button>
               </div>
 
-              <div className="slide-stage" ref={slideStageRef} style={{ height: `${slideViewportHeight}px` }}>
-                {pageImageUrl ? (
-                  <img key={pageImageUrl} src={pageImageUrl} alt={`${title} page ${currentPage}`} className="viewer-image" />
-                ) : (
-                  <p className="hint">Slide image is not ready yet. Run deployment again.</p>
-                )}
-              </div>
-
               {!isEmbedMode && (
                 <div className="actions">
                   <a href={selectedPdfUrl} target="_blank" rel="noreferrer">
@@ -373,6 +365,14 @@ function App() {
 
               {!isEmbedMode && <p className="notice">Embed URL: <code>{embedUrl}</code></p>}
               {notice && <p className="notice">{notice}</p>}
+
+              <div className="slide-stage" ref={slideStageRef} style={{ height: `${slideViewportHeight}px` }}>
+                {pageImageUrl ? (
+                  <img key={pageImageUrl} src={pageImageUrl} alt={`${title} page ${currentPage}`} className="viewer-image" />
+                ) : (
+                  <p className="hint">Slide image is not ready yet. Run deployment again.</p>
+                )}
+              </div>
             </>
           )}
         </section>
