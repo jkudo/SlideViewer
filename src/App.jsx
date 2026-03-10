@@ -217,7 +217,7 @@ function App() {
 
       const rect = slideStageRef.current.getBoundingClientRect()
       const viewportPadding = isEmbedMode ? 10 : 16
-      const minHeight = isEmbedMode ? 96 : 120
+      const minHeight = isEmbedMode ? 72 : 80
       const viewportHeight = window.visualViewport?.height || window.innerHeight
       const availableHeight = Math.floor(viewportHeight - rect.top - viewportPadding)
       const nextHeight = Math.max(minHeight, availableHeight)
@@ -374,7 +374,6 @@ function App() {
                 </div>
               )}
 
-              {!isEmbedMode && <p className="notice">Embed URL: <code>{embedUrl}</code></p>}
               {notice && <p className="notice">{notice}</p>}
 
               <div className="slide-stage" ref={slideStageRef} style={{ height: `${slideViewportHeight}px` }}>
