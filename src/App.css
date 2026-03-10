@@ -182,7 +182,7 @@ button:disabled {
 
 .slide-stage {
   width: 100%;
-  min-height: 240px;
+  min-height: 120px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #f3f6fb;
@@ -230,7 +230,7 @@ button:disabled {
 }
 
 .embed .slide-stage {
-  min-height: 180px;
+  min-height: 96px;
 }
 
 @media (min-width: 1000px) {

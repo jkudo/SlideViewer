@@ -217,8 +217,9 @@ function App() {
 
       const rect = slideStageRef.current.getBoundingClientRect()
       const viewportPadding = isEmbedMode ? 10 : 16
-      const minHeight = isEmbedMode ? 180 : 240
-      const availableHeight = Math.floor(window.innerHeight - rect.top - viewportPadding)
+      const minHeight = isEmbedMode ? 96 : 120
+      const viewportHeight = window.visualViewport?.height || window.innerHeight
+      const availableHeight = Math.floor(viewportHeight - rect.top - viewportPadding)
       const nextHeight = Math.max(minHeight, availableHeight)
 
       setSlideViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight))
@@ -226,10 +227,20 @@ function App() {
 
     const rafId = window.requestAnimationFrame(updateSlideViewportHeight)
     window.addEventListener('resize', updateSlideViewportHeight)
+    window.visualViewport?.addEventListener('resize', updateSlideViewportHeight)
+
+    const observer = new ResizeObserver(() => {
+      updateSlideViewportHeight()
+    })
+    if (slideStageRef.current?.parentElement) {
+      observer.observe(slideStageRef.current.parentElement)
+    }
 
     return () => {
       window.cancelAnimationFrame(rafId)
       window.removeEventListener('resize', updateSlideViewportHeight)
+      window.visualViewport?.removeEventListener('resize', updateSlideViewportHeight)
+      observer.disconnect()
     }
   }, [error, isEmbedMode, loadingDecks, pageCount, selectedDeck?.id])
 
