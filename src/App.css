@@ -106,8 +106,11 @@ h2 {
   background: #fff;
   border-radius: 12px;
   text-align: left;
-  padding: 0.65rem 0.7rem;
+  padding: 0.5rem 0.7rem 0.6rem;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .deck-item.active {
@@ -120,12 +123,17 @@ h2 {
   display: block;
 }
 
+.deck-item span {
+  line-height: 1.25;
+}
+
 .deck-item small {
   color: var(--ink-3);
+  line-height: 1.25;
 }
 
 .deck-time {
-  margin-top: 0.15rem;
+  margin-top: 0;
   font-size: 0.78rem;
 }
 
