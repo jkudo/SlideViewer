@@ -1,0 +1,175 @@
+name: Deploy To GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install conversion tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice poppler-utils fonts-noto-cjk fonts-ipafont-gothic fonts-ipafont-mincho locales
+          sudo locale-gen ja_JP.UTF-8
+          sudo update-locale LANG=ja_JP.UTF-8
+          fc-cache -f -v
+
+      - name: Convert PowerPoint files to PDF
+        run: |
+          export LANG=ja_JP.UTF-8
+          export LC_ALL=ja_JP.UTF-8
+          mkdir -p public/decks
+          mkdir -p public/decks/pdfs
+          mkdir -p public/decks/images
+
+          found=0
+          shopt -s nullglob
+          for file in decks/*.{ppt,pptx,PPT,PPTX}; do
+            found=1
+            base_name="$(basename "$file")"
+            stem="${base_name%.*}"
+            libreoffice --headless --convert-to pdf --outdir public/decks/pdfs "$file"
+            mkdir -p "public/decks/images/$stem"
+            pdftoppm -jpeg -forcenum "public/decks/pdfs/${stem}.pdf" "public/decks/images/$stem/$stem"
+            # Normalize generated PDF filename for stable URLs.
+            if [ -f "public/decks/pdfs/$stem.pdf" ] && [ "$stem.pdf" != "${stem}.pdf" ]; then
+              mv "public/decks/pdfs/$stem.pdf" "public/decks/pdfs/${stem}.pdf"
+            fi
+          done
+
+          if [ "$found" -eq 0 ]; then
+            echo "No PowerPoint files found under decks/."
+          fi
+
+      - name: Generate deck manifest
+        run: |
+          node <<'EOF'
+          const fs = require('fs')
+          const path = require('path')
+          const { execSync } = require('child_process')
+
+          const sourceDir = path.join(process.cwd(), 'decks')
+          const pdfDir = path.join(process.cwd(), 'public', 'decks', 'pdfs')
+          const imageRootDir = path.join(process.cwd(), 'public', 'decks', 'images')
+          const outFile = path.join(process.cwd(), 'public', 'decks', 'index.json')
+
+          const decks = []
+
+          if (fs.existsSync(sourceDir)) {
+            const entries = fs.readdirSync(sourceDir, { withFileTypes: true })
+            const pptFiles = entries
+              .filter((entry) => entry.isFile() && /\.(ppt|pptx)$/i.test(entry.name))
+              .map((entry) => entry.name)
+              .sort((a, b) => a.localeCompare(b))
+
+            for (const fileName of pptFiles) {
+              const stem = fileName.replace(/\.[^.]+$/, '')
+              const pdfPath = path.join(pdfDir, `${stem}.pdf`)
+              if (!fs.existsSync(pdfPath)) {
+                continue
+              }
+
+              let pageCount = 0
+              try {
+                const value = execSync(`pdfinfo "${pdfPath}" | awk '/^Pages:/ {print $2}'`, { encoding: 'utf-8' }).trim()
+                pageCount = Number.parseInt(value, 10) || 0
+              } catch {
+                pageCount = 0
+              }
+
+              const imageDir = path.join(imageRootDir, stem)
+              const pages = fs.existsSync(imageDir)
+                ? fs.readdirSync(imageDir)
+                    .filter((name) => /^.+-\d+\.jpe?g$/i.test(name))
+                    .sort((a, b) => {
+                      const ai = Number.parseInt((a.match(/-(\d+)\./) || [])[1] || '0', 10)
+                      const bi = Number.parseInt((b.match(/-(\d+)\./) || [])[1] || '0', 10)
+                      return ai - bi
+                    })
+                    .map((name) => `decks/images/${stem}/${name}`)
+                : []
+
+              if (pageCount === 0) {
+                pageCount = pages.length
+              }
+
+              let uploadedAt = ''
+              try {
+                uploadedAt = execSync(`git log -1 --format=%aI -- "decks/${fileName}"`, { encoding: 'utf-8' }).trim()
+              } catch {
+                uploadedAt = ''
+              }
+
+              decks.push({
+                id: stem.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+                title: stem.replace(/[-_]+/g, ' ').trim(),
+                fileName,
+                sourcePath: `decks/${fileName}`,
+                pdfPath: `decks/pdfs/${stem}.pdf`,
+                pageCount,
+                pages,
+                uploadedAt
+              })
+            }
+          }
+
+          decks.sort((a, b) => {
+            const at = a.uploadedAt ? Date.parse(a.uploadedAt) : 0
+            const bt = b.uploadedAt ? Date.parse(b.uploadedAt) : 0
+            return bt - at
+          })
+
+          fs.mkdirSync(path.dirname(outFile), { recursive: true })
+          fs.writeFileSync(outFile, JSON.stringify({ decks }, null, 2))
+          console.log(`Generated ${outFile} with ${decks.length} deck(s).`)
+          EOF
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
