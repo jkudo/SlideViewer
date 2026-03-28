@@ -3,6 +3,9 @@
 SlideViewer on GitHub is a SlideShare-like app on GitHub Pages.
 Upload PowerPoint files to the repository, and the site lists and displays them one slide image at a time.
 
+# Demo
+https://jkudo.github.io/slideviewer/?deck=slidedemo&page=1
+
 ## How It Works
 
 1. Put `.ppt` or `.pptx` files in `decks/`.
